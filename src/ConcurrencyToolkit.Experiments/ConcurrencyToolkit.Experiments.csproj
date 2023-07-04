@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\..\concurrencytoolkit.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ConcurrencyToolkit\ConcurrencyToolkit.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Threading.RateLimiting" Version="8.0.0-preview.5.23280.8"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\concurrencytoolkit.snk">
+      <Link>concurrencytoolkit.snk</Link>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+    <RuntimeIdentifiers>linux-arm64;win-x64</RuntimeIdentifiers>
+    <IsPackable>false</IsPackable>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\..\concurrencytoolkit.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.13.5"/>
+    <PackageReference Include="System.IO.Pipelines" Version="7.0.0"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ConcurrencyToolkit.Experiments\ConcurrencyToolkit.Experiments.csproj"/>
+    <ProjectReference Include="..\ConcurrencyToolkit\ConcurrencyToolkit.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\concurrencytoolkit.snk">
+      <Link>concurrencytoolkit.snk</Link>
+    </None>
+  </ItemGroup>
+
+</Project>

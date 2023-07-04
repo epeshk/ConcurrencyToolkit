@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>annotations</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Uncomment constants for testing -->
+    <!--        <DefineConstants>CONCURRENCY_METRICS;RANDOM_OUTOFMEMORY</DefineConstants>-->
+    <!--        <DefineConstants>CONCURRENCY_METRICS</DefineConstants>-->
+    <!--        <DefineConstants>SEGMENT_SIZE_1;CONCURRENCY_METRICS;CT_ASSERT</DefineConstants>-->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <RepositoryUrl>https://github.com/epeshk/ConcurrencyToolkit</RepositoryUrl>
+    <PackageId>ConcurrencyToolkit</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>epeshk</Authors>
+    <Description>Concurrent collections and synchronization primitives for writing fast multithreaded and asynchronous code</Description>
+    <Deterministic>true</Deterministic>
+    <Title>ConcurrencyToolkit</Title>
+    <Copyright>epeshk</Copyright>
+    <PackageProjectUrl>https://github.com/epeshk/ConcurrencyToolkit</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryType>GitHub</RepositoryType>
+    <PackageTags>semaphore lifosemaphore prioritysemaphore singlewriterdictionary stripeddictionary lockless locklessarraypool</PackageTags>
+    <PackageReadmeFile>readme.md</PackageReadmeFile>
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>..\..\concurrencytoolkit.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\concurrencytoolkit.snk">
+      <Link>concurrencytoolkit.snk</Link>
+    </None>
+    <None Include="..\..\readme.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+</Project>

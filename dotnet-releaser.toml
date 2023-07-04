@@ -1,0 +1,15 @@
+# configuration file for dotnet-releaser
+[msbuild]
+project = "src/ConcurrencyToolkit/ConcurrencyToolkit.csproj"
+configuration = "Release"
+
+[github]
+user = "epeshk"
+repo = "ConcurrencyToolkit"
+version_prefix = "v"
+
+[test]
+enable = false
+
+[coverage]
+enable = false
