@@ -26,7 +26,7 @@ Concurrent collections and synchronization primitives for writing fast multithre
 
 ### ConcurrencyToolkit.Collections
 - `SingleWriterDictionary<TKey, TValue, TComparer>`: memory-compact hash map that supports single writer and multiple readers simultaneously. Writes are lock-free (except for resizes, which may trigger GC), but reads may be retried when a parallel update occurs.
-- `StripedDicitonary<TKey, TValue, TComparer>`: memory-compact hash map, designed to avoid `ConcurrentDictionary` GC overhead. It is not general purpose `ConcurrentDictionary` replacement, and generally slower than it, especially for reads.
+- `StripedDicitonary<TKey, TValue, TComparer>`: memory-compact hash map, designed to avoid `ConcurrentDictionary` GC overhead. It is not general purpose `ConcurrentDictionary` replacement, and generally is slower, especially for reads.
 - `DefaultComparer<TKey>`: default comparer for ConcurrencyToolkit hash maps
 - `ComparerWrapper<TKey>`: struct wrapper over the reference type comparer
 

@@ -25,7 +25,7 @@ namespace ConcurrencyToolkit.Collections;
 /// Memory-compact (like non thread-safe <see cref="Dictionary{TKey,TValue}"/>): data is stored in arrays that are only reallocated on resizes.
 /// </para>
 /// <para>
-/// Not lockless for both write and read operations: writes happen under per-segment lock, reads may be retried when a parallel update occurs. It is generally slower than <see cref="ConcurrentDictionary{TKey,TValue}"/>, especially for reads, but helps to beat GC overhead.
+/// Not lockless for both write and read operations: writes happen under per-segment lock, reads may be retried when a parallel update occurs. It is generally is slower than <see cref="ConcurrentDictionary{TKey,TValue}"/>, especially for reads, but helps to beat GC overhead.
 /// </para>
 /// <para>
 /// Not sealed to allow creation of inheritor without <typeparamref name="TComparer"/> type parameter.
