@@ -25,6 +25,7 @@ namespace ConcurrencyToolkit.Collections;
 /// </remarks>
 public partial class SingleWriterDictionary<TKey, TValue, TComparer>
   where TComparer : struct, IEqualityComparer<TKey>
+  where TKey : notnull
 {
   private SingleWriterSegment<TKey, TValue, TComparer> segment;
 

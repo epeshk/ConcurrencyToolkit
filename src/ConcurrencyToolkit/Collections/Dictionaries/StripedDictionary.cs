@@ -33,6 +33,7 @@ namespace ConcurrencyToolkit.Collections;
 /// </remarks>
 public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>
   where TComparer : struct, IEqualityComparer<TKey>
+  where TKey : notnull
 {
   private TComparer comparer;
 
