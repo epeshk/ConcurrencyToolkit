@@ -275,8 +275,6 @@ public class SingleWriterDictionaryBenchmarks
       foreach (var guid in keys_shuffled_read[0])
       {
         dict.TryGetValue(guid, out var val);
-        if (!allowedValues.Contains(val))
-          throw new();
       }
     }
   }
