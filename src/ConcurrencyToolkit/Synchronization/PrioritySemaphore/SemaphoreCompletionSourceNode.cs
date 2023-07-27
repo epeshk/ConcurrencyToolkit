@@ -47,9 +47,17 @@ internal class SemaphoreCompletionSourceNode
 
   public void ResetAndReturn(bool result = false)
   {
-    if (Registration != default)
-      Registration.Dispose();
-    Token = default;
+    var registration = Registration;
+    if (registration != default)
+    {
+      if (result)
+      {
+        Counter<RegistrationDisposed>.Increment();
+        registration.Dispose();
+      }
+      Registration = default;
+      Token = default;
+    }
     core.Reset();
     LiteObjectPool<SemaphoreCompletionSourceNode>.Return(this);
   }

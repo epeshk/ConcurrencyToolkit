@@ -39,6 +39,7 @@ internal class CancellableSemaphoreCompletionSource
         registration.Dispose();
       }
       Registration = default;
+      Token = default;
     }
 
     Segment = default!;
