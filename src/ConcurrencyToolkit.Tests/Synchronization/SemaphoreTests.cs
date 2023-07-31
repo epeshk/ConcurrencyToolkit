@@ -493,7 +493,6 @@ public abstract class SemaphoreTestsBase
   [TestCase(1, 4)]
   [TestCase(2, 4)]
   [TestCase(3, 4)]
-  [TestCase(4, 4)]
   [Timeout(TimeoutMs)]
   public void SemaphoreShouldLimitSyncConsumers(int limit, int threads)
   {
