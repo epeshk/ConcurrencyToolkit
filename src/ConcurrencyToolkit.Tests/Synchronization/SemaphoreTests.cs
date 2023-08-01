@@ -127,9 +127,9 @@ public abstract class SemaphoreTestsBase
   [TestCase(1, 4)]
   [TestCase(2, 4)]
   [TestCase(3, 4)]
-  [TestCase(4, 4)]
+  [TestCase(4, 4, true)]
   [Timeout(TimeoutMs)]
-  public void SemaphoreShouldLimitAsyncConsumers(int limit, int threads)
+  public void SemaphoreShouldLimitAsyncConsumers(int limit, int threads, bool withWorkload = false)
   {
     var semaphore = Create(limit);
 
@@ -155,6 +155,10 @@ public abstract class SemaphoreTestsBase
               if (Interlocked.Increment(ref parallelTasks) > limit)
                 Assert.Fail("Semaphore is broken");
               execs[num]++;
+
+              if (withWorkload)
+                Workload(0.01);
+
               Interlocked.Decrement(ref parallelTasks);
             }
             finally
@@ -177,15 +181,15 @@ public abstract class SemaphoreTestsBase
   [TestCase(1, 4)]
   [TestCase(2, 4)]
   [TestCase(3, 4)]
-  [TestCase(4, 4)]
+  [TestCase(4, 4, true)]
   [Timeout(TimeoutMs)]
-  public void SemaphoreShouldLimitAsyncConsumers_WithCancellation(int limit, int threads)
+  public void SemaphoreShouldLimitAsyncConsumers_WithCancellation(int limit, int threads, bool withWorkload = false)
   {
     var semaphore = Create(limit);
 
     var tasks = new Task[threads];
     var sw = Stopwatch.StartNew();
-    var TL = TimeSpan.FromMilliseconds(2000);//TimeLimit);
+    var TL = TimeLimit;
 
     var parallelTasks = 0;
     var execs = new int[threads];
@@ -224,6 +228,9 @@ public abstract class SemaphoreTestsBase
                   otherCts?.Cancel();
                 }
 
+                if (withWorkload)
+                  Workload(0.01);
+
                 Interlocked.Decrement(ref parallelTasks);
               }
               finally
@@ -254,9 +261,9 @@ public abstract class SemaphoreTestsBase
   [TestCase(1, 4)]
   [TestCase(2, 4)]
   [TestCase(3, 4)]
-  [TestCase(4, 4)]
+  [TestCase(4, 4, true)]
   [Timeout(TimeoutMs)]
-  public void SemaphoreShouldLimitAsyncConsumers_WithCancellation_Throwing(int limit, int threads)
+  public void SemaphoreShouldLimitAsyncConsumers_WithCancellation_Throwing(int limit, int threads, bool withWorkload = false)
   {
     var semaphore = Create(limit);
 
@@ -305,6 +312,9 @@ public abstract class SemaphoreTestsBase
                   otherCts?.Cancel();
                 }
 
+                if (withWorkload)
+                  Workload(0.01);
+
                 Interlocked.Decrement(ref parallelTasks);
               }
               finally
@@ -335,9 +345,9 @@ public abstract class SemaphoreTestsBase
   [TestCase(1, 4)]
   [TestCase(2, 4)]
   [TestCase(3, 4)]
-  [TestCase(4, 4)]
+  [TestCase(4, 4, true)]
   [Timeout(TimeoutMs)]
-  public void SemaphoreShouldLimitSyncConsumers_WithCancellation(int limit, int threads)
+  public void SemaphoreShouldLimitSyncConsumers_WithCancellation(int limit, int threads, bool withWorkload = false)
   {
     var semaphore = Create(limit);
 
@@ -382,6 +392,9 @@ public abstract class SemaphoreTestsBase
                   otherCts?.Cancel();
                 }
 
+                if (withWorkload)
+                  Workload(0.01);
+
                 Interlocked.Decrement(ref parallelTasks);
               }
               finally
@@ -412,9 +425,9 @@ public abstract class SemaphoreTestsBase
   [TestCase(1, 4)]
   [TestCase(2, 4)]
   [TestCase(3, 4)]
-  [TestCase(4, 4)]
+  [TestCase(4, 4, true)]
   [Timeout(TimeoutMs)]
-  public void SemaphoreShouldLimitSyncConsumers_WithCancellation_Throwing(int limit, int threads)
+  public void SemaphoreShouldLimitSyncConsumers_WithCancellation_Throwing(int limit, int threads, bool withWorkload = false)
   {
     var semaphore = Create(limit);
 
@@ -463,6 +476,9 @@ public abstract class SemaphoreTestsBase
                   otherCts?.Cancel();
                 }
 
+                if (withWorkload)
+                  Workload(0.01);
+
                 Interlocked.Decrement(ref parallelTasks);
               }
               finally
@@ -493,9 +509,9 @@ public abstract class SemaphoreTestsBase
   [TestCase(1, 4)]
   [TestCase(2, 4)]
   [TestCase(3, 4)]
-  [TestCase(4, 4)]
+  [TestCase(4, 4, true)]
   [Timeout(TimeoutMs)]
-  public void SemaphoreShouldLimitSyncConsumers(int limit, int threads)
+  public void SemaphoreShouldLimitSyncConsumers(int limit, int threads, bool withWorkload = false)
   {
     var semaphore = Create(limit);
 
@@ -525,6 +541,10 @@ public abstract class SemaphoreTestsBase
               if (!fullThroughputReached && currentWorkers == limit)
                 fullThroughputReached = true;
               execs[num]++;
+
+              if (withWorkload)
+                Workload(0.01);
+
               Interlocked.Decrement(ref parallelTasks);
             }
             finally
@@ -596,5 +616,10 @@ public abstract class SemaphoreTestsBase
     cts2.Cancel();
     if (semaphore is SemaphoreSlimWrapper) Thread.Sleep(100);
     semaphore.CurrentQueue.Should().Be(0);
+  }
+
+  private void Workload(double p)
+  {
+    while (Random.Shared.NextDouble() > p) ;
   }
 }
