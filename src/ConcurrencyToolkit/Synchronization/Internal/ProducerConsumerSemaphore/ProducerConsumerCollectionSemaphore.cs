@@ -242,7 +242,7 @@ internal sealed class ProducerConsumerCollectionSemaphore<TCollection> : ISemaph
         if (collection.TryTake(out var waiter))
           return CompleteWaiter(waiter.Value);
 
-        spinner.SpinOnce();
+        spinner.SpinOnce(-1);
       }
     }
   }

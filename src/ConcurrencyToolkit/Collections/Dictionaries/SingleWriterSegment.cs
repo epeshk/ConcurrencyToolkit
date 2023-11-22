@@ -354,7 +354,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
 
     do
     {
-      spinner.SpinOnce();
+      spinner.SpinOnce(-1);
     } while (!TrySearchInBucket(currentState, key, bucket, hashCode, out found, out value));
 
     return found;
@@ -484,7 +484,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
             }
             else
             {
-              spinner.SpinOnce();
+              spinner.SpinOnce(-1);
             }
           }
           while (!TryCopyBucket(currentState, bucket, array, out copiedCount));
