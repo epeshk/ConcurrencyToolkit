@@ -32,3 +32,7 @@ Concurrent collections and synchronization primitives for writing fast multithre
 
 ### ConcurrencyToolkit.Metrics
 - `ThreadSafeCounter64`: scalable atomic counter that distributes writes across per-core variables
+
+### ConcurrencyToolkit.Threading
+- `InterlockedFloatingPoint`: methods for atomic floating point arithmetics
+- `LowLatencySpinWait`: `SpinWait` implementation that achieves low latency (~0.5ms) on sleeps instead of standard 15ms

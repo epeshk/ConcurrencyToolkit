@@ -106,7 +106,7 @@ public class SemaphoreBenchmarks : SemaphoreBenchmarkBase
       task.GetAwaiter().GetResult();
   }
 
-  [Benchmark]
+  // [Benchmark]
   public void BenchmarkSemaphoreSync()
   {
     var semaphore = Impl;
@@ -140,7 +140,7 @@ public class SemaphoreBenchmarks : SemaphoreBenchmarkBase
       task.GetAwaiter().GetResult();
   }
 
-  [Benchmark]
+  // [Benchmark]
   public void BenchmarkSemaphoreSync_WithToken()
   {
     var semaphore = Impl;
