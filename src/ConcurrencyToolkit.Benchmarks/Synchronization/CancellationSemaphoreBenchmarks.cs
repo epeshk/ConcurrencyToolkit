@@ -5,6 +5,7 @@ using ConcurrencyToolkit.Synchronization;
 namespace ConcurrencyToolkit.Benchmarks.Synchronization;
 
 [SimpleJob(RuntimeMoniker.Net80)]
+[SimpleJob(RuntimeMoniker.Net90)]
 // [SimpleJob(RuntimeMoniker.NativeAot80)]
 [MemoryDiagnoser]
 [WarmupCount(32)]
@@ -109,8 +110,83 @@ public class CancellationSemaphoreBenchmarks : SemaphoreBenchmarkBase
     if (semaphore.CurrentCount < MaxPermits)
       DrainSemaphore(MaxPermits, semaphore);
   }
-
   [Benchmark]
+  public void BenchmarkSemaphore_Throwing()
+  {
+    var semaphore = Impl;
+    var Parallelism = Parameters.Parallelism;
+
+    var tasks = new List<Task>(Parallelism);
+    var cts = new PaddedReference<CancellationTokenSource>[Parallelism];
+
+    var n = Parameters.BatchSize;
+
+    var inside = 0;
+    var MaxPermits = Parameters.Permits;
+
+    for (int i = 0; i < Parallelism; i++)
+    {
+      var taskId = i;
+      tasks.Add(Task.Run(async () =>
+      {
+        var toDo = 0;
+        var p = Parameters.CancellationProbability;
+        var source = cts[taskId].Object = new();
+        while (toDo < n)
+        {
+          try
+          {
+            try
+            {
+              await semaphore.AcquireAsync(source.Token);
+            }
+            catch (OperationCanceledException)
+            {
+              cts[taskId].Object = source = new();
+              continue;
+            }
+          }
+          catch (OutOfMemoryException)
+          {
+            continue;
+          }
+
+          try
+          {
+            var curInside = Interlocked.Increment(ref inside);
+            if (curInside > MaxPermits)
+              throw new($"Limit violation {curInside} > {MaxPermits}");
+            toDo++;
+
+            if (Random.Shared.NextDouble() < p)
+            {
+              int rand = taskId;
+              while (rand == taskId)
+                rand = Random.Shared.Next(cts.Length);
+              if (rand != taskId)
+                cts[Random.Shared.Next(cts.Length)].Object?.Cancel();
+            }
+          }
+          finally
+          {
+            Interlocked.Decrement(ref inside);
+            semaphore.Release();
+          }
+        }
+      }));
+    }
+
+    foreach (var task in tasks)
+      task.GetAwaiter().GetResult();
+
+    if (semaphore.CurrentCount > MaxPermits)
+      throw new($"semaphore.CurrentCount > MaxPermits: {semaphore.CurrentCount} > {MaxPermits}");
+
+    if (semaphore.CurrentCount < MaxPermits)
+      DrainSemaphore(MaxPermits, semaphore);
+  }
+
+  // [Benchmark]
   public void BenchmarkSemaphore_Sync()
   {
     var semaphore = Impl;
