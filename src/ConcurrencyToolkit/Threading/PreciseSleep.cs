@@ -10,7 +10,7 @@ internal static class PreciseSleep
     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
       WindowsPreciseSleep.SleepOnce();
     else
-      Nanosleep.Sleep(TimeSpan.FromMilliseconds(scale * 0.1));
+      Nanosleep.Sleep(TimeSpan.FromMilliseconds(scale * 0.05));
   }
 }
 

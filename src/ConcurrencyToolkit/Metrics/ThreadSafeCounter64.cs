@@ -205,6 +205,8 @@ static class ShardingId
     if (c == 0)
     {
       current = (uint)Environment.CurrentManagedThreadId;
+      if (current == 0)
+        current = 1; // should not be zero
       return;
     }
     c ^= c << 13;

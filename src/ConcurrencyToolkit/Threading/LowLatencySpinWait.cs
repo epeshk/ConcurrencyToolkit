@@ -4,31 +4,9 @@ using System.Runtime.CompilerServices;
 
 namespace ConcurrencyToolkit.Threading;
 
-
 /// <summary>
-/// Provides support for spin-based waiting.
+/// Provides support for spin-based waiting. Unlike <see cref="SpinWait"/> uses native low latency sleep functions instead of <see cref="System.Threading.Thread.Sleep(1)"/>.
 /// </summary>
-/// <remarks>
-/// <para>
-/// <see cref="SpinWait"/> encapsulates common spinning logic. On single-processor machines, yields are
-/// always used instead of busy waits, and on computers with Intel(R) processors employing Hyper-Threading
-/// technology, it helps to prevent hardware thread starvation. SpinWait encapsulates a good mixture of
-/// spinning and true yielding.
-/// </para>
-/// <para>
-/// <see cref="SpinWait"/> is a value type, which means that low-level code can utilize SpinWait without
-/// fear of unnecessary allocation overheads. SpinWait is not generally useful for ordinary applications.
-/// In most cases, you should use the synchronization classes provided by the .NET Framework, such as
-/// <see cref="Monitor"/>. For most purposes where spin waiting is required, however,
-/// the <see cref="SpinWait"/> type should be preferred over the <see
-/// cref="Thread.SpinWait"/> method.
-/// </para>
-/// <para>
-/// While SpinWait is designed to be used in concurrent applications, it is not designed to be
-/// used from multiple threads concurrently.  SpinWait's members are not thread-safe.  If multiple
-/// threads must spin, each should use its own instance of SpinWait.
-/// </para>
-/// </remarks>
 public struct LowLatencySpinWait
 {
   internal static bool IsSingleProcessor = Environment.ProcessorCount == 1;
@@ -167,14 +145,10 @@ public struct LowLatencySpinWait
       // Sleep(0), which considers all runnable threads at equal priority. Even this
       // is insufficient since we may be spin waiting for lower priority threads to
       // execute; we therefore must call OS Delay function once in a while too, which considers
-      // all runnable threads, regardless of ideal processor and priority, but may
-      // remove the thread from the scheduler's queue for 10+ms, if the system is
-      // configured to use the (default) coarse-grained system timer.
-      //
-
+      // all runnable threads, regardless of ideal processor and priority
       if (_count >= sleep1Threshold && sleep1Threshold >= 0)
       {
-        PreciseSleep.Sleep(Math.Min(_count - sleep1Threshold + 1, 5));
+        PreciseSleep.Sleep(Math.Min(_count - sleep1Threshold + 1, 10));
       }
       else
       {
