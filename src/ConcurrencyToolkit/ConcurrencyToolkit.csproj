@@ -14,7 +14,7 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <RepositoryUrl>https://github.com/epeshk/ConcurrencyToolkit</RepositoryUrl>
     <PackageId>ConcurrencyToolkit</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.2.1</Version>
     <Authors>epeshk</Authors>
     <Description>Concurrent collections and synchronization primitives for writing fast multithreaded and asynchronous code</Description>
     <Deterministic>true</Deterministic>
