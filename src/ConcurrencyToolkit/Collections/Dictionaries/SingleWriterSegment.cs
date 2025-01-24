@@ -18,7 +18,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   private const int HashCodesMask = int.MaxValue;
 
   public readonly object SyncObject = new();
-  private TComparer comparer;
+  public WrappedComparer<TKey, TComparer> comparer;
 
   private volatile State state;
   private volatile int count;
@@ -29,7 +29,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
 
   public int Capacity => state?.entries?.Length ?? 0;
 
-  public SingleWriterSegment(int capacity, TComparer comparer)
+  public SingleWriterSegment(int capacity, WrappedComparer<TKey, TComparer> comparer)
   {
     this.comparer = comparer;
     count = 0;
@@ -50,7 +50,10 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   /// <para>Returns <c>false</c> if <paramref name="canOverwrite"/> is <c>false</c> and an existing key/value pair was encountered.</para>
   /// </summary>
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  internal bool Insert<TModifyPolicy>(TKey key, TValue value, uint hashCode) where TModifyPolicy : struct, IModifyPolicy
+  internal bool Insert<TModifyPolicy, TAlternateKey, TEquality>(TAlternateKey key, TValue value, uint hashCode) where TModifyPolicy : struct, IModifyPolicy where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     var state = this.state;
     var buckets = state.buckets;
@@ -64,7 +67,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
     var collisionCount = 0;
     for (var i = buckets[bucket]; i != -1; i = entries[i].next)
     {
-      if (entries[i].hash == hashCode && comparer.Equals(entries[i].key, key))
+      if (entries[i].hash == hashCode && comparer.Equals<TAlternateKey, TEquality>(key, entries[i].key))
       {
         if (TModifyPolicy.CanModify)
         {
@@ -92,11 +95,14 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
     if (!TModifyPolicy.MayAdd)
       return false;
 
-    return AddNewItem(key, value, hashCode, state, bucket, ref version);
+    return AddNewItem<TAlternateKey, TEquality>(key, value, hashCode, state, bucket, ref version);
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  internal bool Update(TKey key, TValue value, TValue comparand, uint hashCode)
+  internal bool Update<TAlternateKey, TEquality>(TAlternateKey key, TValue value, TValue comparand, uint hashCode) where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     var state = this.state;
     var buckets = state.buckets;
@@ -110,7 +116,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
     var collisionCount = 0;
     for (var i = buckets[bucket]; i != -1; i = entries[i].next)
     {
-      if (entries[i].hash == hashCode && comparer.Equals(entries[i].key, key))
+      if (entries[i].hash == hashCode && comparer.Equals<TAlternateKey, TEquality>(key, entries[i].key))
       {
         if (!EqualityComparer<TValue>.Default.Equals(entries[i].value, comparand))
           return false;
@@ -136,7 +142,10 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
     return false;
   }
 
-  private bool AddNewItem(TKey key, TValue value, uint hashCode, State state, uint bucket, ref int version)
+  private bool AddNewItem<TAlternateKey, TEquality>(TAlternateKey key, TValue value, uint hashCode, State state, uint bucket, ref int version) where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     if (Atomic<TValue>.IsValueWriteAtomic)
       version = ref state.bucketVersions[GetBucketVersionIndex(bucket)];
@@ -150,7 +159,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
     }
     else if (count == state.entries.Length)
     {
-      return InsertWithResize(key, value, hashCode);
+      return InsertWithResize<TAlternateKey, TEquality>(key, value, hashCode);
     }
     else
     {
@@ -158,7 +167,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
     }
 
     state.entries[index].value = value;
-    state.entries[index].key = key;
+    state.entries[index].key = comparer.CreateKey<TAlternateKey, TEquality>(key);
     state.entries[index].hash = hashCode;
     state.entries[index].next = state.buckets[bucket];
     var cur = MarkBucketForWriting(ref version);
@@ -169,7 +178,10 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   }
 
   [MethodImpl(MethodImplOptions.NoInlining)]
-  private bool InsertWithResize(TKey key, TValue value, uint hashCode)
+  private bool InsertWithResize<TAlternateKey, TEquality>(TAlternateKey key, TValue value, uint hashCode) where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     Resize();
 
@@ -182,7 +194,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
     var index = count++;
 
     entries[index].value = value;
-    entries[index].key = key;
+    entries[index].key = comparer.CreateKey<TAlternateKey, TEquality>(key);
     entries[index].hash = hashCode;
     entries[index].next = state.buckets[bucket];
 
@@ -194,7 +206,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   }
 
   /// <summary>
-  /// <para>This method exists to optimize resizing in <see cref="StripedGuidDictionary{T}"/>.</para>
+  /// <para>This method exists to optimize resizing.</para>
   /// <para>It omits some of the code related to concurrency with readers and free list management.</para>
   /// <para>Caution: calls to this method must not contend with any read access!</para>
   /// <para>Caution: calls to this method must only be made with unique keys!</para>
@@ -225,7 +237,11 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   #region Remove
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  public bool Remove(TKey key, uint hashCode, out TValue value)
+  public bool Remove<TAlternateKey, TEquality>(TAlternateKey key, uint hashCode, out TValue value)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     var state = this.state;
     var buckets = state.buckets;
@@ -237,7 +253,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
 
     for (var i = buckets[bucket]; i != -1; last = i, i = entries[i].next)
     {
-      if (entries[i].hash == hashCode && comparer.Equals(entries[i].key, key))
+      if (entries[i].hash == hashCode && comparer.Equals<TAlternateKey, TEquality>(key, entries[i].key))
       {
         value = entries[i].value;
         var cur = MarkBucketForWriting(state, bucketVersionIndex);
@@ -270,7 +286,11 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  public bool Remove(KeyValuePair<TKey, TValue> pair, uint hashCode)
+  public bool Remove<TAlternateKey, TEquality>(TAlternateKey key, TValue value, uint hashCode)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     var state = this.state;
     var buckets = state.buckets;
@@ -283,9 +303,9 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
 
     for (var i = buckets[bucket]; i != -1; last = i, i = entries[i].next)
     {
-      if (entries[i].hash == hashCode && comparer.Equals(entries[i].key, pair.Key))
+      if (entries[i].hash == hashCode && comparer.Equals<TAlternateKey, TEquality>(key, entries[i].key))
       {
-        if (!EqualityComparer<TValue>.Default.Equals(entries[i].value, pair.Value))
+        if (!EqualityComparer<TValue>.Default.Equals(entries[i].value, value))
           return false;
 
         var cur = MarkBucketForWriting(state, bucketVersionIndex);
@@ -323,31 +343,49 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
 
   #region TryGetValue
 
+  // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  // public bool TryGetValue(TKey key, uint hashCode, out TValue value) => TryGetValue<TKey, DirectEquality>(key, hashCode, out value);
+  //
+  // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  // public bool TryGetValueAlternate<TAlternateKey>(TAlternateKey key, uint hashCode, out TValue value) => TryGetValue<TAlternateKey, AlternateEquality>(key, hashCode, out value);
+
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  public bool TryGetValue(TKey key, uint hashCode, out TValue value)
+  public bool TryGetValue<TAlternateKey, TEquality>(TAlternateKey key, uint hashCode, out TValue value)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     var currentState = state;
 
     var bucket = (int)currentState.Index((uint)hashCode);
 
-    if (TrySearchInBucket(currentState, key, bucket, hashCode, out var found, out value))
+    if (TrySearchInBucket<TAlternateKey, TEquality>(currentState, key, bucket, hashCode, out var found, out value))
       return found;
 
-    return TryGetValue_SlowPath(key, hashCode, out value, currentState, bucket);
+    return TryGetValue_SlowPath<TAlternateKey, TEquality>(key, hashCode, out value, currentState, bucket);
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  public bool TryGetValueUnsafe(TKey key, uint hashCode, out TValue value)
+  public bool TryGetValueUnsafe<TAlternateKey, TEquality>(TAlternateKey key, uint hashCode, out TValue value)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     var currentState = state;
 
     var bucket = (int)currentState.Index((uint)hashCode);
 
-    return SearchInBucketUnsafe(currentState, key, bucket, hashCode, out value);
+    return SearchInBucketUnsafe<TAlternateKey, TEquality>(currentState, key, bucket, hashCode, out value);
   }
 
   [MethodImpl(MethodImplOptions.NoInlining)]
-  private bool TryGetValue_SlowPath(TKey key, uint hashCode, out TValue value, State currentState, int bucket)
+  private bool TryGetValue_SlowPath<TAlternateKey, TEquality>(TAlternateKey key, uint hashCode, out TValue value, State currentState, int bucket)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     bool found;
     var spinner = new SpinWait();
@@ -355,13 +393,17 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
     do
     {
       spinner.SpinOnce(-1);
-    } while (!TrySearchInBucket(currentState, key, bucket, hashCode, out found, out value));
+    } while (!TrySearchInBucket<TAlternateKey, TEquality>(currentState, key, bucket, hashCode, out found, out value));
 
     return found;
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private bool TrySearchInBucket(State state, TKey key, int bucket, uint hashCode, out bool found, out TValue value)
+  private bool TrySearchInBucket<TAlternateKey, TEquality>(State state, TAlternateKey key, int bucket, uint hashCode, out bool found, out TValue value)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     found = false;
     value = default;
@@ -380,7 +422,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
       if (!TryReadEntryExpectingHash(state, index, ref version, versionBefore, out entry, hashCode, out var hashCodeEquals))
         return false;
 
-      if (hashCodeEquals && comparer.Equals(entry.key, key))
+      if (hashCodeEquals && comparer.Equals<TAlternateKey, TEquality>(key, entry.key))
       {
         found = true;
 
@@ -398,7 +440,11 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private bool SearchInBucketUnsafe(State state, TKey key, int bucket, uint hashCode, out TValue value)
+  private bool SearchInBucketUnsafe<TAlternateKey, TEquality>(State state, TAlternateKey key, int bucket, uint hashCode, out TValue value)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     value = default;
 
@@ -410,7 +456,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
       ref var entry = ref state.entries[index];
       var hashCodeEquals = /*SkipHashCodeComparison || */entry.hash == hashCode;
 
-      if (hashCodeEquals && comparer.Equals(entry.key, key))
+      if (hashCodeEquals && comparer.Equals<TAlternateKey, TEquality>(key, entry.key))
       {
         value = entry.value;
         return true;
@@ -685,5 +731,75 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
     count = 0;
     freeCount = 0;
     freeList = -1;
+  }
+}
+
+struct WrappedComparer<TKey, TComparer> where TComparer : struct, IEqualityComparer<TKey>
+{
+  private readonly TComparer comparer;
+  private readonly IEqualityComparer<TKey> comparerObject;
+
+  public WrappedComparer(TComparer comparer)
+  {
+    this.comparer = comparer;
+    comparerObject = GetComparerObject(comparer);
+  }
+
+  public bool IsCompatibleKey<TAlternateKey>()
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
+    => comparerObject is IAlternateEqualityComparer<TAlternateKey, TKey>;
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  public bool Equals(TKey x, TKey y) => comparer.Equals(x, y);
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  public bool Equals<TAlternateKey, TEquality>(TAlternateKey x, TKey y) where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
+  {
+    var xx = x;
+    return typeof(TEquality) == typeof(DirectEquality)
+      ? comparer.Equals(Unsafe.As<TAlternateKey, TKey>(ref xx), y)
+      : Unsafe.As<IAlternateEqualityComparer<TAlternateKey, TKey>>(comparerObject).Equals(x, y);
+  }
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  public int GetHashCode(TKey x) => comparer.GetHashCode(x);
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  public int GetHashCode<TAlternateKey, TEquality>(TAlternateKey x) where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
+  {
+    var xx = x;
+    return typeof(TEquality) == typeof(DirectEquality)
+      ? comparer.GetHashCode(Unsafe.As<TAlternateKey, TKey>(ref xx))
+      : Unsafe.As<IAlternateEqualityComparer<TAlternateKey, TKey>>(comparerObject).GetHashCode(x);
+  }
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  public TKey CreateKey<TAlternateKey, TEquality>(TAlternateKey x) where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
+  {
+    var xx = x;
+    return typeof(TEquality) == typeof(DirectEquality)
+      ? Unsafe.As<TAlternateKey, TKey>(ref xx)
+      : Unsafe.As<IAlternateEqualityComparer<TAlternateKey, TKey>>(comparerObject).Create(x);
+  }
+
+
+  private static IEqualityComparer<TKey> GetComparerObject(TComparer? comparer)
+  {
+    if (comparer is DefaultComparer<TKey> || comparer is null)
+      return EqualityComparer<TKey>.Default;
+    if (comparer is ComparerWrapper<TKey> comparerWrapper)
+      return comparerWrapper.comparer ?? EqualityComparer<TKey>.Default;
+    return comparer;
   }
 }
