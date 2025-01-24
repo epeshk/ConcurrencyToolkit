@@ -2,6 +2,7 @@
 // https://github.com/epeshk/ConcurrencyToolkit
 
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using ConcurrencyToolkit.Internal;
 
@@ -13,12 +14,10 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
   public sealed class DictionaryWriter : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>
   {
     private readonly SingleWriterDictionary<TKey, TValue, TComparer> that;
-    private TComparer comparer;
 
-    internal DictionaryWriter(SingleWriterDictionary<TKey, TValue, TComparer> that, TComparer comparer)
+    internal DictionaryWriter(SingleWriterDictionary<TKey, TValue, TComparer> that)
     {
       this.that = that;
-      this.comparer = comparer;
 
       Keys = new KeysCollection<TKey, TValue>(this);
       Values = new ValuesCollection<TKey, TValue>(this);
@@ -47,7 +46,7 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Remove(KeyValuePair<TKey, TValue> item) =>
-      that.segment.Remove(item, ComputeHash(item.Key));
+      that.segment.Remove<TKey, DirectEquality>(item.Key, item.Value, ComputeHash(item.Key));
 
     public int Count => that.segment.Count;
     public bool IsReadOnly => false;
@@ -60,17 +59,17 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryAdd(TKey key, TValue value) => that.segment.Insert<RefuseModifyPolicy>(key, value, ComputeHash(key));
+    public bool TryAdd(TKey key, TValue value) => that.segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, value, ComputeHash(key));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool ContainsKey(TKey key) => TryGetValue(key, out _);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Remove(TKey key) => that.segment.Remove(key, ComputeHash(key), out _);
+    public bool Remove(TKey key) => that.segment.Remove<TKey, DirectEquality>(key, ComputeHash(key), out _);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetValue(TKey key, out TValue value) =>
-      that.segment.TryGetValueUnsafe(key, ComputeHash(key), out value);
+      that.segment.TryGetValueUnsafe<TKey, DirectEquality>(key, ComputeHash(key), out value);
 
     public TValue this[TKey key]
     {
@@ -78,7 +77,7 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
       get => TryGetValue(key, out var value) ? value : ThrowHelper.KeyNotFound<TKey, TValue>(key);
 
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      set => that.segment.Insert<CanModifyPolicy>(key, value, (uint)comparer.GetHashCode(key) & HashCodesMask);
+      set => that.segment.Insert<CanModifyPolicy, TKey, DirectEquality>(key, value, ComputeHash(key));
     }
 
     IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys => Keys;
@@ -92,8 +91,23 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private uint ComputeHash(TKey key)
     {
-      ArgumentNullException.ThrowIfNull(key);
-      return (uint)comparer.GetHashCode(key) & HashCodesMask;
+      ThrowHelper.ThrowIfNull(key);
+      return (uint)that.segment.comparer.GetHashCode(key) & HashCodesMask;
     }
+
+#if NET9_0_OR_GREATER
+    public bool TryGetAlternateWriter<TAlternateKey>(out AlternateWriter<TAlternateKey> alternateReader)
+      where TAlternateKey : allows ref struct
+    {
+      if (!that.segment.comparer.IsCompatibleKey<TAlternateKey>())
+      {
+        alternateReader = default;
+        return false;
+      }
+
+      alternateReader = new AlternateWriter<TAlternateKey>(that);
+      return true;
+    }
+#endif
   }
 }

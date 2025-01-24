@@ -2,6 +2,7 @@
 // https://github.com/epeshk/ConcurrencyToolkit
 
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using ConcurrencyToolkit.Internal;
 
@@ -13,13 +14,8 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
   public sealed class DictionaryReader : IReadOnlyDictionary<TKey, TValue>
   {
     private readonly SingleWriterDictionary<TKey, TValue, TComparer> that;
-    private TComparer comparer;
 
-    internal DictionaryReader(SingleWriterDictionary<TKey, TValue, TComparer> that, TComparer comparer)
-    {
-      this.that = that;
-      this.comparer = comparer;
-    }
+    internal DictionaryReader(SingleWriterDictionary<TKey, TValue, TComparer> that) => this.that = that;
 
     public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => that.segment.GetEnumerator();
 
@@ -32,13 +28,13 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetValue(TKey key, out TValue value) =>
-      that.segment.TryGetValue(key, ComputeHash(key), out value);
+      that.segment.TryGetValue<TKey, DirectEquality>(key, ComputeHash(key), out value);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private uint ComputeHash(TKey key)
     {
       ArgumentNullException.ThrowIfNull(key);
-      return (uint)comparer.GetHashCode(key) & HashCodesMask;
+      return (uint)that.segment.comparer.GetHashCode(key) & HashCodesMask;
     }
 
     public TValue this[TKey key]
@@ -50,5 +46,20 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
     public IEnumerable<TKey> Keys => this.Select(x => x.Key);
     public IEnumerable<TValue> Values => this.Select(x => x.Value);
     public int Capacity => that.segment.Capacity;
+
+#if NET9_0_OR_GREATER
+    public bool TryGetAlternateReader<TAlternateKey>(out AlternateReader<TAlternateKey> alternateReader)
+      where TAlternateKey : allows ref struct
+    {
+      if (!that.segment.comparer.IsCompatibleKey<TAlternateKey>())
+      {
+        alternateReader = default;
+        return false;
+      }
+
+      alternateReader = new AlternateReader<TAlternateKey>(that);
+      return true;
+    }
+#endif
   }
 }

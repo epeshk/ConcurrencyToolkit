@@ -50,9 +50,38 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
 
   public SingleWriterDictionary(int capacity = 128, TComparer comparer = default)
   {
-    segment = new(capacity, comparer);
+    var wrappedComparer = new WrappedComparer<TKey, TComparer>(comparer);
+    segment = new(capacity, wrappedComparer);
 
-    Reader = new(this, comparer);
-    Writer = new(this, comparer);
+    Reader = new(this);
+    Writer = new(this);
   }
+
+#if NET9_0_OR_GREATER
+  public bool TryGetAlternateLookup<TAlternateKey>(out AlternateLookup<TAlternateKey> alternateLookup)
+    where TAlternateKey : allows ref struct
+  {
+    if (!segment.comparer.IsCompatibleKey<TAlternateKey>())
+    {
+      alternateLookup = default;
+      return false;
+    }
+
+    alternateLookup = new AlternateLookup<TAlternateKey>(this);
+    return true;
+  }
+
+  public readonly struct AlternateLookup<TAlternateKey>
+    where TAlternateKey : allows ref struct
+  {
+    public readonly AlternateReader<TAlternateKey> Reader;
+    public readonly AlternateWriter<TAlternateKey> Writer;
+
+    internal AlternateLookup(SingleWriterDictionary<TKey, TValue, TComparer> dictionary)
+    {
+      Reader = new(dictionary);
+      Writer = new(dictionary);
+    }
+  }
+#endif
 }

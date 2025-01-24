@@ -12,7 +12,7 @@ public struct ComparerWrapper<TKey> : IEqualityComparer<TKey>
   /// <br/>
   /// <c>null</c> for value types when default comparer is used.
   /// </remarks>
-  private readonly IEqualityComparer<TKey>? comparer;
+  internal readonly IEqualityComparer<TKey>? comparer;
 
   public ComparerWrapper(IEqualityComparer<TKey>? comparer)
   {

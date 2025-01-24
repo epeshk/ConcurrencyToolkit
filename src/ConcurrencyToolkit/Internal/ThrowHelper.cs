@@ -40,6 +40,16 @@ internal static class ThrowHelper
 
   public static void OutOfRange_Priority(int priority, int maxPriority) =>
     throw new ArgumentOutOfRangeException(nameof(priority), priority, $"Priority should be >= 0 && <= {maxPriority}");
+
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  public static void ThrowIfNull<T>(T argument, [CallerArgumentExpression(nameof(argument))] string? paramName=null)
+#if NET9_0_OR_GREATER
+    where T : allows ref struct
+#endif
+  {
+    if (argument is null)
+      ArgumentNullException.ThrowIfNull((object)null, paramName);
+  }
 }
 
 internal static class ValueTasks

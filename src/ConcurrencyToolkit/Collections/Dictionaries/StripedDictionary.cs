@@ -35,7 +35,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
   where TComparer : struct, IEqualityComparer<TKey>
   where TKey : notnull
 {
-  private TComparer comparer;
+  private WrappedComparer<TKey, TComparer> comparer;
 
   private const uint HashCodesMask = int.MaxValue;
 
@@ -52,11 +52,11 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
   /// </param>
   public StripedDictionary(int concurrencyLevel = 31, int initialSegmentCapacity = 16, TComparer comparer = default)
   {
-    this.comparer = comparer;
+    this.comparer = new(comparer);
     segments = new SingleWriterSegment<TKey, TValue, TComparer>[HashHelpers.GetConcurrencyLevel(concurrencyLevel)];
 
     for (int i = 0; i < segments.Length; i++)
-      segments[i] = new(initialSegmentCapacity, comparer);
+      segments[i] = new(initialSegmentCapacity, this.comparer);
 
     Keys = new KeysCollection<TKey, TValue>(this);
     Values = new ValuesCollection<TKey, TValue>(this);
@@ -90,7 +90,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     ref var segment = ref currentSegments[hash % (uint)currentSegments.Length];
 
-    return segment.TryGetValue(item.Key, hash, out var value) &&
+    return segment.TryGetValue<TKey, DirectEquality>(item.Key, hash, out var value) &&
            EqualityComparer<TValue>.Default.Equals(value, item.Value);
   }
 
@@ -111,7 +111,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
     ref var segment = ref currentSegments[hash % (uint)currentSegments.Length];
 
     lock (segment.SyncObject)
-      return segment.Remove(item, hash);
+      return segment.Remove<TKey, DirectEquality>(item.Key, item.Value, hash);
   }
 
   public int Count
@@ -174,7 +174,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
     ref var segment = ref currentSegments[hash % (uint)currentSegments.Length];
 
     lock (segment.SyncObject)
-      return segment.Insert<TOverridePolicy>(key, value, hash);
+      return segment.Insert<TOverridePolicy, TKey, DirectEquality>(key, value, hash);
   }
 
   #endregion
@@ -190,7 +190,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
     lock (segment.SyncObject)
-      return segment.Remove(key, hash, out _);
+      return segment.Remove<TKey, DirectEquality>(key, hash, out _);
   }
 
   #endregion
@@ -205,7 +205,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
-    if (segment.TryGetValue(key, hash, out value))
+    if (segment.TryGetValue<TKey, DirectEquality>(key, hash, out value))
       return true;
 
     value = default;
@@ -220,7 +220,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     ref var segment = ref currentSegments[hash % (uint)currentSegments.Length];
 
-    return segment.TryGetValue(key, hash, out _);
+    return segment.TryGetValue<TKey, DirectEquality>(key, hash, out _);
   }
 
   #endregion
@@ -284,10 +284,10 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     lock (segment.SyncObject)
     {
-      if (segment.TryGetValueUnsafe(key, hash, out var value) &&
+      if (segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out var value) &&
           EqualityComparer<TValue>.Default.Equals(value, comparisonValue))
       {
-        segment.Insert<CanModifyPolicy>(key, newValue, hash);
+        segment.Insert<CanModifyPolicy, TKey, DirectEquality>(key, newValue, hash);
         return true;
       }
     }
@@ -304,7 +304,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
     lock (segment.SyncObject)
-      return segment.Remove(key, hash, out value);
+      return segment.Remove<TKey, DirectEquality>(key, hash, out value);
   }
 
   public bool TryRemove(KeyValuePair<TKey, TValue> pair)
@@ -316,7 +316,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
     lock (segment.SyncObject)
-      return segment.Remove(pair, hash);
+      return segment.Remove<TKey, DirectEquality>(pair.Key, pair.Value, hash);
   }
 
   public TValue GetOrAdd(TKey key, TValue value)
@@ -327,14 +327,14 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
-    if (segment.TryGetValue(key, hash, out var existingValue))
+    if (segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
       return existingValue;
 
     lock (segment.SyncObject)
     {
-      if (segment.TryGetValueUnsafe(key, hash, out existingValue))
+      if (segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
         return existingValue;
-      segment.Insert<RefuseModifyPolicy>(key, value, hash);
+      segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, value, hash);
       return value;
     }
   }
@@ -348,16 +348,16 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
-    if (segment.TryGetValue(key, hash, out var existingValue))
+    if (segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
       return existingValue;
 
     var value = valueFactory(key);
 
     lock (segment.SyncObject)
     {
-      if (segment.TryGetValueUnsafe(key, hash, out existingValue))
+      if (segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
         return existingValue;
-      segment.Insert<RefuseModifyPolicy>(key, value, hash);
+      segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, value, hash);
       return value;
     }
   }
@@ -371,16 +371,16 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
-    if (segment.TryGetValue(key, hash, out var existingValue))
+    if (segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
       return existingValue;
 
     var value = valueFactory(key, factoryArgument);
 
     lock (segment.SyncObject)
     {
-      if (segment.TryGetValueUnsafe(key, hash, out existingValue))
+      if (segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
         return existingValue;
-      segment.Insert<RefuseModifyPolicy>(key, value, hash);
+      segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, value, hash);
       return value;
     }
   }
@@ -399,14 +399,14 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     while (true)
     {
-      if (!segment.TryGetValue(key, hash, out var existingValue))
+      if (!segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
       {
         var addValue = addValueFactory(key, factoryArgument);
         lock (segment.SyncObject)
         {
-          if (!segment.TryGetValueUnsafe(key, hash, out existingValue))
+          if (!segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
           {
-            segment.Insert<RefuseModifyPolicy>(key, addValue, hash);
+            segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, addValue, hash);
             return addValue;
           }
         }
@@ -416,7 +416,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
         var newValue = updateValueFactory(key, existingValue, factoryArgument);
         lock (segment.SyncObject)
         {
-          if (segment.Update(key, newValue, existingValue, hash))
+          if (segment.Update<TKey, DirectEquality>(key, newValue, existingValue, hash))
             return newValue;
         }
       }
@@ -435,14 +435,14 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     while (true)
     {
-      if (!segment.TryGetValue(key, hash, out var existingValue))
+      if (!segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
       {
         var addValue = addValueFactory(key);
         lock (segment.SyncObject)
         {
-          if (!segment.TryGetValueUnsafe(key, hash, out existingValue))
+          if (!segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
           {
-            segment.Insert<RefuseModifyPolicy>(key, addValue, hash);
+            segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, addValue, hash);
             return addValue;
           }
         }
@@ -452,7 +452,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
         var newValue = updateValueFactory(key, existingValue);
         lock (segment.SyncObject)
         {
-          if (segment.Update(key, newValue, existingValue, hash))
+          if (segment.Update<TKey, DirectEquality>(key, newValue, existingValue, hash))
             return newValue;
         }
       }
@@ -470,13 +470,13 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     while (true)
     {
-      if (!segment.TryGetValue(key, hash, out var existingValue))
+      if (!segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
       {
         lock (segment.SyncObject)
         {
-          if (!segment.TryGetValueUnsafe(key, hash, out existingValue))
+          if (!segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
           {
-            segment.Insert<RefuseModifyPolicy>(key, addValue, hash);
+            segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, addValue, hash);
             return addValue;
           }
         }
@@ -486,7 +486,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
         var newValue = updateValueFactory(key, existingValue);
         lock (segment.SyncObject)
         {
-          if (segment.Update(key, newValue, existingValue, hash))
+          if (segment.Update<TKey, DirectEquality>(key, newValue, existingValue, hash))
             return newValue;
         }
       }
