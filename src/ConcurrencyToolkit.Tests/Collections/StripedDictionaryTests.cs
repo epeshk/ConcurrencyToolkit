@@ -759,6 +759,22 @@ public class StripedDictionaryTests
       }));
   }
 
+  [Test]
+  public void AlternateLookup()
+  {
+    var dict = new StripedDictionary<string, string, ComparerWrapper<string>>(comparer: new(StringComparer.Ordinal));
+    dict["abc"] = "xyz";
+
+    dict.TryGetAlternateLookup<ReadOnlySpan<char>>(out var lookup).Should().BeTrue();
+    Span<char> key = stackalloc char[3];
+    key[0] = 'a';
+    key[1] = 'b';
+    key[2] = 'c';
+    lookup[key].Should().Be("xyz");
+    lookup[key] = "123";
+    lookup[key].Should().Be("123");
+  }
+
   private record struct Struct16(long a, long b);
   private class ThreadData
   {

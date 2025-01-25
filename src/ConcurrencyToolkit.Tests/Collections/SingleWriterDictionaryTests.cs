@@ -19,6 +19,5 @@ public class SingleWriterDictionaryTests
     lookup.Reader[key].Should().Be("xyz");
     lookup.Writer[key] = "123";
     lookup.Reader[key].Should().Be("123");
-
   }
 }
