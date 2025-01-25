@@ -31,7 +31,7 @@ namespace ConcurrencyToolkit.Collections;
 /// Not sealed to allow creation of inheritor without <typeparamref name="TComparer"/> type parameter.
 /// </para>
 /// </remarks>
-public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>
+public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>
   where TComparer : struct, IEqualityComparer<TKey>
   where TKey : notnull
 {
@@ -156,71 +156,93 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
   #region Add, Set
 
-  public bool TryAdd(TKey key, TValue value) => Insert<RefuseModifyPolicy>(key, value);
+  public bool TryAdd(TKey key, TValue value) => Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, value);
 
   public void Add(TKey key, TValue value)
   {
-    if (!Insert<RefuseModifyPolicy>(key, value))
+    if (!Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, value))
       ThrowHelper.KeyAlreadyExists(key);
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private bool Insert<TOverridePolicy>(TKey key, TValue value) where TOverridePolicy : struct, IModifyPolicy
+  private bool Insert<TOverridePolicy, TAlternateKey, TEquality>(TAlternateKey key, TValue value)
+    where TOverridePolicy : struct, IModifyPolicy
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
     ref var segment = ref currentSegments[hash % (uint)currentSegments.Length];
 
     lock (segment.SyncObject)
-      return segment.Insert<TOverridePolicy, TKey, DirectEquality>(key, value, hash);
+      return segment.Insert<TOverridePolicy, TAlternateKey, TEquality>(key, value, hash);
   }
 
   #endregion
 
   #region Remove
 
-  public bool Remove(TKey key)
+  public bool Remove(TKey key) => Remove<TKey, DirectEquality>(key);
+
+  private bool Remove<TAlternateKey, TEquality>(TAlternateKey key)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
     lock (segment.SyncObject)
-      return segment.Remove<TKey, DirectEquality>(key, hash, out _);
+      return segment.Remove<TAlternateKey, TEquality>(key, hash, out _);
   }
 
   #endregion
 
   #region Search
 
-  public bool TryGetValue(TKey key, out TValue value)
+  public bool TryGetValue(TKey key, out TValue value) => TryGetValue<TKey, DirectEquality>(key, out value);
+  private bool TryGetValue<TAlternateKey, TEquality>(TAlternateKey key, out TValue value)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
-    if (segment.TryGetValue<TKey, DirectEquality>(key, hash, out value))
+    if (segment.TryGetValue<TAlternateKey, TEquality>(key, hash, out value))
       return true;
 
     value = default;
     return false;
   }
 
-  public bool ContainsKey(TKey key)
+  public bool ContainsKey(TKey key) => ContainsKey<TKey, DirectEquality>(key);
+
+  private bool ContainsKey<TAlternateKey, TEquality>(TAlternateKey key)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
     ref var segment = ref currentSegments[hash % (uint)currentSegments.Length];
 
-    return segment.TryGetValue<TKey, DirectEquality>(key, hash, out _);
+    return segment.TryGetValue<TAlternateKey, TEquality>(key, hash, out _);
   }
 
   #endregion
@@ -233,7 +255,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
     get => TryGetValue(key, out var value) ? value : ThrowHelper.KeyNotFound<TKey, TValue>(key);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    set => Insert<CanModifyPolicy>(key, value);
+    set => Insert<CanModifyPolicy, TKey, DirectEquality>(key, value);
   }
 
   IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys => Keys;
@@ -272,11 +294,27 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
     return (uint)comparer.GetHashCode(key) & HashCodesMask;
   }
 
+  [MethodImpl(MethodImplOptions.AggressiveInlining)]
+  private uint ComputeHash<TAlternateKey, TEquality>(TAlternateKey key)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
+  {
+    ThrowHelper.ThrowIfNull(key);
+    return (uint)comparer.GetHashCode<TAlternateKey, TEquality>(key) & HashCodesMask;
+  }
+
   #endregion
 
-  public bool TryUpdate(TKey key, TValue newValue, TValue comparisonValue)
+  public bool TryUpdate(TKey key, TValue newValue, TValue comparisonValue) => TryUpdate<TKey, DirectEquality>(key, newValue, comparisonValue);
+  private bool TryUpdate<TAlternateKey, TEquality>(TAlternateKey key, TValue newValue, TValue comparisonValue)
+  where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+  where TAlternateKey : allows ref struct
+#endif
   {
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
@@ -284,10 +322,10 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     lock (segment.SyncObject)
     {
-      if (segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out var value) &&
+      if (segment.TryGetValueUnsafe<TAlternateKey, TEquality>(key, hash, out var value) &&
           EqualityComparer<TValue>.Default.Equals(value, comparisonValue))
       {
-        segment.Insert<CanModifyPolicy, TKey, DirectEquality>(key, newValue, hash);
+        segment.Insert<CanModifyPolicy, TAlternateKey, TEquality>(key, newValue, hash);
         return true;
       }
     }
@@ -295,103 +333,140 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
     return false;
   }
 
-  public bool TryRemove(TKey key, out TValue value)
+  public bool TryRemove(TKey key, out TValue value) => TryRemove<TKey, DirectEquality>(key, out value);
+  private bool TryRemove<TAlternateKey, TEquality>(TAlternateKey key, out TValue value)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
     lock (segment.SyncObject)
-      return segment.Remove<TKey, DirectEquality>(key, hash, out value);
+      return segment.Remove<TAlternateKey, TEquality>(key, hash, out value);
   }
 
-  public bool TryRemove(KeyValuePair<TKey, TValue> pair)
+  public bool TryRemove(KeyValuePair<TKey, TValue> pair) => TryRemove<TKey, DirectEquality>(pair.Key, pair.Value);
+  private bool TryRemove<TAlternateKey, TEquality>(TAlternateKey key, TValue value)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
-    var hash = ComputeHash(pair.Key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
     lock (segment.SyncObject)
-      return segment.Remove<TKey, DirectEquality>(pair.Key, pair.Value, hash);
+      return segment.Remove<TAlternateKey, TEquality>(key, value, hash);
   }
 
-  public TValue GetOrAdd(TKey key, TValue value)
+  public TValue GetOrAdd(TKey key, TValue value) => GetOrAdd<TKey, DirectEquality>(key, value);
+
+  private TValue GetOrAdd<TAlternateKey, TEquality>(TAlternateKey key, TValue value)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
-    if (segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
+    if (segment.TryGetValue<TAlternateKey, TEquality>(key, hash, out var existingValue))
       return existingValue;
 
     lock (segment.SyncObject)
     {
-      if (segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
+      if (segment.TryGetValueUnsafe<TAlternateKey, TEquality>(key, hash, out existingValue))
         return existingValue;
-      segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, value, hash);
+      segment.Insert<RefuseModifyPolicy, TAlternateKey, TEquality>(key, value, hash);
       return value;
     }
   }
 
   public TValue GetOrAdd(TKey key, Func<TKey, TValue> valueFactory)
+    => GetOrAdd<TKey, DirectEquality>(key, valueFactory);
+
+  private TValue GetOrAdd<TAlternateKey, TEquality>(TAlternateKey key, Func<TAlternateKey, TValue> valueFactory)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     ArgumentNullException.ThrowIfNull(valueFactory);
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
-    if (segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
+    if (segment.TryGetValue<TAlternateKey, TEquality>(key, hash, out var existingValue))
       return existingValue;
 
     var value = valueFactory(key);
 
     lock (segment.SyncObject)
     {
-      if (segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
+      if (segment.TryGetValueUnsafe<TAlternateKey, TEquality>(key, hash, out existingValue))
         return existingValue;
-      segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, value, hash);
+      segment.Insert<RefuseModifyPolicy, TAlternateKey, TEquality>(key, value, hash);
       return value;
     }
   }
 
   public TValue GetOrAdd<TArg>(TKey key, Func<TKey, TArg, TValue> valueFactory, TArg factoryArgument)
+    => GetOrAdd<TKey, DirectEquality, TArg>(key, valueFactory, factoryArgument);
+  private TValue GetOrAdd<TAlternateKey, TEquality, TArg>(TAlternateKey key, Func<TAlternateKey, TArg, TValue> valueFactory, TArg factoryArgument)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     ArgumentNullException.ThrowIfNull(valueFactory);
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
     ref var segment = ref currentSegments[hash % (uint)segments.Length];
 
-    if (segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
+    if (segment.TryGetValue<TAlternateKey, TEquality>(key, hash, out var existingValue))
       return existingValue;
 
     var value = valueFactory(key, factoryArgument);
 
     lock (segment.SyncObject)
     {
-      if (segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
+      if (segment.TryGetValueUnsafe<TAlternateKey, TEquality>(key, hash, out existingValue))
         return existingValue;
-      segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, value, hash);
+      segment.Insert<RefuseModifyPolicy, TAlternateKey, TEquality>(key, value, hash);
       return value;
     }
   }
 
   public TValue AddOrUpdate<TArg>(
     TKey key, Func<TKey, TArg, TValue> addValueFactory, Func<TKey, TValue, TArg, TValue> updateValueFactory,
+    TArg factoryArgument) =>
+    AddOrUpdate<TKey, DirectEquality, TArg>(key, addValueFactory, updateValueFactory, factoryArgument);
+  private TValue AddOrUpdate<TAlternateKey, TEquality, TArg>(
+    TAlternateKey key, Func<TAlternateKey, TArg, TValue> addValueFactory, Func<TAlternateKey, TValue, TArg, TValue> updateValueFactory,
     TArg factoryArgument)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     ArgumentNullException.ThrowIfNull(addValueFactory);
     ArgumentNullException.ThrowIfNull(updateValueFactory);
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
@@ -399,14 +474,14 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     while (true)
     {
-      if (!segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
+      if (!segment.TryGetValue<TAlternateKey, TEquality>(key, hash, out var existingValue))
       {
         var addValue = addValueFactory(key, factoryArgument);
         lock (segment.SyncObject)
         {
-          if (!segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
+          if (!segment.TryGetValueUnsafe<TAlternateKey, TEquality>(key, hash, out existingValue))
           {
-            segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, addValue, hash);
+            segment.Insert<RefuseModifyPolicy, TAlternateKey, TEquality>(key, addValue, hash);
             return addValue;
           }
         }
@@ -416,7 +491,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
         var newValue = updateValueFactory(key, existingValue, factoryArgument);
         lock (segment.SyncObject)
         {
-          if (segment.Update<TKey, DirectEquality>(key, newValue, existingValue, hash))
+          if (segment.Update<TAlternateKey, TEquality>(key, newValue, existingValue, hash))
             return newValue;
         }
       }
@@ -424,10 +499,16 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
   }
 
   public TValue AddOrUpdate(TKey key, Func<TKey, TValue> addValueFactory, Func<TKey, TValue, TValue> updateValueFactory)
+    => AddOrUpdate(key, addValueFactory, updateValueFactory);
+  private TValue AddOrUpdate<TAlternateKey, TEquality>(TAlternateKey key, Func<TAlternateKey, TValue> addValueFactory, Func<TAlternateKey, TValue, TValue> updateValueFactory)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     ArgumentNullException.ThrowIfNull(addValueFactory);
     ArgumentNullException.ThrowIfNull(updateValueFactory);
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
@@ -435,14 +516,14 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     while (true)
     {
-      if (!segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
+      if (!segment.TryGetValue<TAlternateKey, TEquality>(key, hash, out var existingValue))
       {
         var addValue = addValueFactory(key);
         lock (segment.SyncObject)
         {
-          if (!segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
+          if (!segment.TryGetValueUnsafe<TAlternateKey, TEquality>(key, hash, out existingValue))
           {
-            segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, addValue, hash);
+            segment.Insert<RefuseModifyPolicy, TAlternateKey, TEquality>(key, addValue, hash);
             return addValue;
           }
         }
@@ -452,7 +533,7 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
         var newValue = updateValueFactory(key, existingValue);
         lock (segment.SyncObject)
         {
-          if (segment.Update<TKey, DirectEquality>(key, newValue, existingValue, hash))
+          if (segment.Update<TAlternateKey, TEquality>(key, newValue, existingValue, hash))
             return newValue;
         }
       }
@@ -460,9 +541,15 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
   }
 
   public TValue AddOrUpdate(TKey key, TValue addValue, Func<TKey, TValue, TValue> updateValueFactory)
+    => AddOrUpdate<TKey, DirectEquality>(key, addValue, updateValueFactory);
+  private TValue AddOrUpdate<TAlternateKey, TEquality>(TAlternateKey key, TValue addValue, Func<TAlternateKey, TValue, TValue> updateValueFactory)
+    where TEquality : struct, IEquality
+#if NET9_0_OR_GREATER
+    where TAlternateKey : allows ref struct
+#endif
   {
     ArgumentNullException.ThrowIfNull(updateValueFactory);
-    var hash = ComputeHash(key);
+    var hash = ComputeHash<TAlternateKey, TEquality>(key);
 
     var currentSegments = segments;
 
@@ -470,13 +557,13 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
 
     while (true)
     {
-      if (!segment.TryGetValue<TKey, DirectEquality>(key, hash, out var existingValue))
+      if (!segment.TryGetValue<TAlternateKey, TEquality>(key, hash, out var existingValue))
       {
         lock (segment.SyncObject)
         {
-          if (!segment.TryGetValueUnsafe<TKey, DirectEquality>(key, hash, out existingValue))
+          if (!segment.TryGetValueUnsafe<TAlternateKey, TEquality>(key, hash, out existingValue))
           {
-            segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, addValue, hash);
+            segment.Insert<RefuseModifyPolicy, TAlternateKey, TEquality>(key, addValue, hash);
             return addValue;
           }
         }
@@ -486,10 +573,25 @@ public class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TVal
         var newValue = updateValueFactory(key, existingValue);
         lock (segment.SyncObject)
         {
-          if (segment.Update<TKey, DirectEquality>(key, newValue, existingValue, hash))
+          if (segment.Update<TAlternateKey, TEquality>(key, newValue, existingValue, hash))
             return newValue;
         }
       }
     }
   }
+
+  #if NET9_0_OR_GREATER
+  public bool TryGetAlternateLookup<TAlternateKey>(out AlternateLookup<TAlternateKey> lookup)
+    where TAlternateKey : allows ref struct
+  {
+    if (!comparer.IsCompatibleKey<TAlternateKey>())
+    {
+      lookup = default;
+      return false;
+    }
+
+    lookup = new AlternateLookup<TAlternateKey>(this);
+    return true;
+  }
+  #endif
 }
