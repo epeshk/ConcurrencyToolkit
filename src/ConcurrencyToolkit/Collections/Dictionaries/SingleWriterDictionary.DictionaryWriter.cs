@@ -40,7 +40,8 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
     void ICollection<KeyValuePair<TKey, TValue>>.CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
     {
       var index = arrayIndex;
-      if (arrayIndex + Count > array.Length) throw new ArgumentException("Provided array is too small to fit the collection.");
+      if (arrayIndex + Count > array.Length)
+        throw new ArgumentException("Provided array is too small to fit the collection.");
       foreach (var key in this) array[index++] = key;
     }
 
@@ -59,7 +60,8 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryAdd(TKey key, TValue value) => that.segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, value, ComputeHash(key));
+    public bool TryAdd(TKey key, TValue value) =>
+      that.segment.Insert<RefuseModifyPolicy, TKey, DirectEquality>(key, value, ComputeHash(key));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool ContainsKey(TKey key) => TryGetValue(key, out _);

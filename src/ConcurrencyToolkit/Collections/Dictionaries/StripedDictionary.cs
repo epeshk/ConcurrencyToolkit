@@ -31,7 +31,8 @@ namespace ConcurrencyToolkit.Collections;
 /// Not sealed to allow creation of inheritor without <typeparamref name="TComparer"/> type parameter.
 /// </para>
 /// </remarks>
-public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>
+public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TKey, TValue>,
+  IReadOnlyDictionary<TKey, TValue>
   where TComparer : struct, IEqualityComparer<TKey>
   where TKey : notnull
 {
@@ -64,7 +65,8 @@ public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TK
 
   /// <param name="enumerable">An enumerable of key-value pairs which will be added to the dictionary.</param>
   /// <inheritdoc cref="M:ConcurrencyToolkit.Collections.StripedDictionary`3.#ctor(System.Int32,System.Int32,`2)"/>
-  public StripedDictionary(IEnumerable<KeyValuePair<TKey, TValue>> enumerable, int concurrencyLevel = 31, int initialSegmentCapacity = 16, TComparer comparer = default)
+  public StripedDictionary(IEnumerable<KeyValuePair<TKey, TValue>> enumerable, int concurrencyLevel = 31,
+    int initialSegmentCapacity = 16, TComparer comparer = default)
     : this(concurrencyLevel, initialSegmentCapacity, comparer)
   {
     foreach (var (key, value) in enumerable)
@@ -209,6 +211,7 @@ public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TK
   #region Search
 
   public bool TryGetValue(TKey key, out TValue value) => TryGetValue<TKey, DirectEquality>(key, out value);
+
   private bool TryGetValue<TAlternateKey, TEquality>(TAlternateKey key, out TValue value)
     where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
@@ -307,11 +310,13 @@ public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TK
 
   #endregion
 
-  public bool TryUpdate(TKey key, TValue newValue, TValue comparisonValue) => TryUpdate<TKey, DirectEquality>(key, newValue, comparisonValue);
+  public bool TryUpdate(TKey key, TValue newValue, TValue comparisonValue) =>
+    TryUpdate<TKey, DirectEquality>(key, newValue, comparisonValue);
+
   private bool TryUpdate<TAlternateKey, TEquality>(TAlternateKey key, TValue newValue, TValue comparisonValue)
-  where TEquality : struct, IEquality
+    where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
-  where TAlternateKey : allows ref struct
+    where TAlternateKey : allows ref struct
 #endif
   {
     var hash = ComputeHash<TAlternateKey, TEquality>(key);
@@ -334,6 +339,7 @@ public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TK
   }
 
   public bool TryRemove(TKey key, out TValue value) => TryRemove<TKey, DirectEquality>(key, out value);
+
   private bool TryRemove<TAlternateKey, TEquality>(TAlternateKey key, out TValue value)
     where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
@@ -351,6 +357,7 @@ public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TK
   }
 
   public bool TryRemove(KeyValuePair<TKey, TValue> pair) => TryRemove<TKey, DirectEquality>(pair.Key, pair.Value);
+
   private bool TryRemove<TAlternateKey, TEquality>(TAlternateKey key, TValue value)
     where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
@@ -425,7 +432,9 @@ public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TK
 
   public TValue GetOrAdd<TArg>(TKey key, Func<TKey, TArg, TValue> valueFactory, TArg factoryArgument)
     => GetOrAdd<TKey, DirectEquality, TArg>(key, valueFactory, factoryArgument);
-  private TValue GetOrAdd<TAlternateKey, TEquality, TArg>(TAlternateKey key, Func<TAlternateKey, TArg, TValue> valueFactory, TArg factoryArgument)
+
+  private TValue GetOrAdd<TAlternateKey, TEquality, TArg>(TAlternateKey key,
+    Func<TAlternateKey, TArg, TValue> valueFactory, TArg factoryArgument)
     where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
     where TAlternateKey : allows ref struct
@@ -456,8 +465,10 @@ public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TK
     TKey key, Func<TKey, TArg, TValue> addValueFactory, Func<TKey, TValue, TArg, TValue> updateValueFactory,
     TArg factoryArgument) =>
     AddOrUpdate<TKey, DirectEquality, TArg>(key, addValueFactory, updateValueFactory, factoryArgument);
+
   private TValue AddOrUpdate<TAlternateKey, TEquality, TArg>(
-    TAlternateKey key, Func<TAlternateKey, TArg, TValue> addValueFactory, Func<TAlternateKey, TValue, TArg, TValue> updateValueFactory,
+    TAlternateKey key, Func<TAlternateKey, TArg, TValue> addValueFactory,
+    Func<TAlternateKey, TValue, TArg, TValue> updateValueFactory,
     TArg factoryArgument)
     where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
@@ -500,7 +511,9 @@ public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TK
 
   public TValue AddOrUpdate(TKey key, Func<TKey, TValue> addValueFactory, Func<TKey, TValue, TValue> updateValueFactory)
     => AddOrUpdate(key, addValueFactory, updateValueFactory);
-  private TValue AddOrUpdate<TAlternateKey, TEquality>(TAlternateKey key, Func<TAlternateKey, TValue> addValueFactory, Func<TAlternateKey, TValue, TValue> updateValueFactory)
+
+  private TValue AddOrUpdate<TAlternateKey, TEquality>(TAlternateKey key, Func<TAlternateKey, TValue> addValueFactory,
+    Func<TAlternateKey, TValue, TValue> updateValueFactory)
     where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
     where TAlternateKey : allows ref struct
@@ -542,7 +555,9 @@ public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TK
 
   public TValue AddOrUpdate(TKey key, TValue addValue, Func<TKey, TValue, TValue> updateValueFactory)
     => AddOrUpdate<TKey, DirectEquality>(key, addValue, updateValueFactory);
-  private TValue AddOrUpdate<TAlternateKey, TEquality>(TAlternateKey key, TValue addValue, Func<TAlternateKey, TValue, TValue> updateValueFactory)
+
+  private TValue AddOrUpdate<TAlternateKey, TEquality>(TAlternateKey key, TValue addValue,
+    Func<TAlternateKey, TValue, TValue> updateValueFactory)
     where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
     where TAlternateKey : allows ref struct
@@ -580,7 +595,7 @@ public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TK
     }
   }
 
-  #if NET9_0_OR_GREATER
+#if NET9_0_OR_GREATER
   public bool TryGetAlternateLookup<TAlternateKey>(out AlternateLookup<TAlternateKey> lookup)
     where TAlternateKey : allows ref struct
   {
@@ -593,5 +608,5 @@ public partial class StripedDictionary<TKey, TValue, TComparer> : IDictionary<TK
     lookup = new AlternateLookup<TAlternateKey>(this);
     return true;
   }
-  #endif
+#endif
 }

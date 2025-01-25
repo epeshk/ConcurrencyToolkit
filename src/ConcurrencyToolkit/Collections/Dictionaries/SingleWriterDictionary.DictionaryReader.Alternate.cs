@@ -36,7 +36,9 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
     public TValue this[TAlternateKey key]
     {
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      get => TryGetValue(key, out var value) ? value : ThrowHelper.KeyNotFound<TKey, TValue>(that.segment.comparer.CreateKey<TAlternateKey, AlternateEquality>(key));
+      get => TryGetValue(key, out var value)
+        ? value
+        : ThrowHelper.KeyNotFound<TKey, TValue>(that.segment.comparer.CreateKey<TAlternateKey, AlternateEquality>(key));
     }
   }
 }
