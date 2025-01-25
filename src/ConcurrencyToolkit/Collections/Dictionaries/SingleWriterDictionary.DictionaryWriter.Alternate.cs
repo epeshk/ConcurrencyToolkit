@@ -1,5 +1,6 @@
 // This file is a part of the ConcurrencyToolkit library
 // https://github.com/epeshk/ConcurrencyToolkit
+
 #if NET9_0_OR_GREATER
 using System.Runtime.CompilerServices;
 using ConcurrencyToolkit.Internal;
@@ -20,7 +21,7 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Remove(TAlternateKey key, TValue value)=>
+    public bool Remove(TAlternateKey key, TValue value) =>
       that.segment.Remove<TAlternateKey, AlternateEquality>(key, value, ComputeHash(key));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -31,13 +32,15 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool TryAdd(TAlternateKey key, TValue value) => that.segment.Insert<RefuseModifyPolicy, TAlternateKey, AlternateEquality>(key, value, ComputeHash(key));
+    public bool TryAdd(TAlternateKey key, TValue value) =>
+      that.segment.Insert<RefuseModifyPolicy, TAlternateKey, AlternateEquality>(key, value, ComputeHash(key));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool ContainsKey(TAlternateKey key) => TryGetValue(key, out _);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Remove(TAlternateKey key) => that.segment.Remove<TAlternateKey, AlternateEquality>(key, ComputeHash(key), out _);
+    public bool Remove(TAlternateKey key) =>
+      that.segment.Remove<TAlternateKey, AlternateEquality>(key, ComputeHash(key), out _);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetValue(TAlternateKey key, out TValue value) =>
@@ -46,7 +49,9 @@ public partial class SingleWriterDictionary<TKey, TValue, TComparer>
     public TValue this[TAlternateKey key]
     {
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
-      get => TryGetValue(key, out var value) ? value : ThrowHelper.KeyNotFound<TKey, TValue>(that.segment.comparer.CreateKey<TAlternateKey, AlternateEquality>(key));
+      get => TryGetValue(key, out var value)
+        ? value
+        : ThrowHelper.KeyNotFound<TKey, TValue>(that.segment.comparer.CreateKey<TAlternateKey, AlternateEquality>(key));
 
       [MethodImpl(MethodImplOptions.AggressiveInlining)]
       set => that.segment.Insert<CanModifyPolicy, TAlternateKey, AlternateEquality>(key, value, ComputeHash(key));

@@ -50,7 +50,9 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   /// <para>Returns <c>false</c> if <paramref name="canOverwrite"/> is <c>false</c> and an existing key/value pair was encountered.</para>
   /// </summary>
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  internal bool Insert<TModifyPolicy, TAlternateKey, TEquality>(TAlternateKey key, TValue value, uint hashCode) where TModifyPolicy : struct, IModifyPolicy where TEquality : struct, IEquality
+  internal bool Insert<TModifyPolicy, TAlternateKey, TEquality>(TAlternateKey key, TValue value, uint hashCode)
+    where TModifyPolicy : struct, IModifyPolicy
+    where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
     where TAlternateKey : allows ref struct
 #endif
@@ -99,7 +101,8 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  internal bool Update<TAlternateKey, TEquality>(TAlternateKey key, TValue value, TValue comparand, uint hashCode) where TEquality : struct, IEquality
+  internal bool Update<TAlternateKey, TEquality>(TAlternateKey key, TValue value, TValue comparand, uint hashCode)
+    where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
     where TAlternateKey : allows ref struct
 #endif
@@ -142,7 +145,8 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
     return false;
   }
 
-  private bool AddNewItem<TAlternateKey, TEquality>(TAlternateKey key, TValue value, uint hashCode, State state, uint bucket, ref int version) where TEquality : struct, IEquality
+  private bool AddNewItem<TAlternateKey, TEquality>(TAlternateKey key, TValue value, uint hashCode, State state,
+    uint bucket, ref int version) where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
     where TAlternateKey : allows ref struct
 #endif
@@ -178,7 +182,8 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   }
 
   [MethodImpl(MethodImplOptions.NoInlining)]
-  private bool InsertWithResize<TAlternateKey, TEquality>(TAlternateKey key, TValue value, uint hashCode) where TEquality : struct, IEquality
+  private bool InsertWithResize<TAlternateKey, TEquality>(TAlternateKey key, TValue value, uint hashCode)
+    where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
     where TAlternateKey : allows ref struct
 #endif
@@ -332,7 +337,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
         return true;
       }
 
-      if (++collisionCount > (uint) state.entries.Length)
+      if (++collisionCount > (uint)state.entries.Length)
         ThrowHelper.InvalidOperation_ConcurrentModification();
     }
 
@@ -381,7 +386,8 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   }
 
   [MethodImpl(MethodImplOptions.NoInlining)]
-  private bool TryGetValue_SlowPath<TAlternateKey, TEquality>(TAlternateKey key, uint hashCode, out TValue value, State currentState, int bucket)
+  private bool TryGetValue_SlowPath<TAlternateKey, TEquality>(TAlternateKey key, uint hashCode, out TValue value,
+    State currentState, int bucket)
     where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
     where TAlternateKey : allows ref struct
@@ -399,7 +405,8 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private bool TrySearchInBucket<TAlternateKey, TEquality>(State state, TAlternateKey key, int bucket, uint hashCode, out bool found, out TValue value)
+  private bool TrySearchInBucket<TAlternateKey, TEquality>(State state, TAlternateKey key, int bucket, uint hashCode,
+    out bool found, out TValue value)
     where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
     where TAlternateKey : allows ref struct
@@ -419,7 +426,8 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
     Entry entry;
     for (var index = state.buckets[bucket]; index != -1; index = entry.next)
     {
-      if (!TryReadEntryExpectingHash(state, index, ref version, versionBefore, out entry, hashCode, out var hashCodeEquals))
+      if (!TryReadEntryExpectingHash(state, index, ref version, versionBefore, out entry, hashCode,
+            out var hashCodeEquals))
         return false;
 
       if (hashCodeEquals && comparer.Equals<TAlternateKey, TEquality>(key, entry.key))
@@ -432,15 +440,16 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
         break;
       }
 
-      if (++collisionCount > (uint) state.entries.Length)
+      if (++collisionCount > (uint)state.entries.Length)
         ThrowHelper.InvalidOperation_ConcurrentModification();
     }
 
-    return true;//Volatile.Read(ref version) == versionBefore;
+    return true; //Volatile.Read(ref version) == versionBefore;
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private bool SearchInBucketUnsafe<TAlternateKey, TEquality>(State state, TAlternateKey key, int bucket, uint hashCode, out TValue value)
+  private bool SearchInBucketUnsafe<TAlternateKey, TEquality>(State state, TAlternateKey key, int bucket, uint hashCode,
+    out TValue value)
     where TEquality : struct, IEquality
 #if NET9_0_OR_GREATER
     where TAlternateKey : allows ref struct
@@ -464,7 +473,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
 
       index = entry.next;
 
-      if (++collisionCount > (uint) state.entries.Length)
+      if (++collisionCount > (uint)state.entries.Length)
         ThrowHelper.InvalidOperation_ConcurrentModification();
     }
 
@@ -532,8 +541,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
             {
               spinner.SpinOnce(-1);
             }
-          }
-          while (!TryCopyBucket(currentState, bucket, array, out copiedCount));
+          } while (!TryCopyBucket(currentState, bucket, array, out copiedCount));
         }
 
         for (var i = 0; i < copiedCount; i++)
@@ -578,7 +586,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
 
       index = entry.next;
 
-      if (++collisionCount > (uint) state.entries.Length)
+      if (++collisionCount > (uint)state.entries.Length)
         ThrowHelper.InvalidOperation_ConcurrentModification();
     }
 
@@ -613,6 +621,7 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   {
     return bucket / BucketsPerVersion;
   }
+
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   private static int GetBucketVersionIndex(uint bucket)
   {
@@ -645,13 +654,15 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   private static void UnmarkBucketForWriting(ref int version, int prevVersion)
   {
-    Volatile.Write(ref version, (prevVersion + 1) & int.MaxValue); // <-- release: all previous writes are completed before unmarking
+    Volatile.Write(ref version,
+      (prevVersion + 1) & int.MaxValue); // <-- release: all previous writes are completed before unmarking
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   private static bool IsMarkedForWriting(ref int bucketVersion, out int version)
   {
-    version = Volatile.Read(ref bucketVersion);  // <-- acquire: version check goes before any attempts to read the data structure
+    version = Volatile.Read(
+      ref bucketVersion); // <-- acquire: version check goes before any attempts to read the data structure
 
     return version < 0;
   }
@@ -671,7 +682,8 @@ internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVa
   /// <c>entry.key</c> and <c>entry.value</c> are not loaded when <paramref name="hashCodeEquals"/> is <c>false</c>
   /// </remarks>
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  private static bool TryReadEntryExpectingHash(State state, int index, ref int version, int versionBefore, out Entry entry,
+  private static bool TryReadEntryExpectingHash(State state, int index, ref int version, int versionBefore,
+    out Entry entry,
     uint hash, out bool hashCodeEquals)
   {
     Unsafe.SkipInit(out entry);
