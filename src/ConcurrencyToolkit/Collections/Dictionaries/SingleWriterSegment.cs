@@ -9,7 +9,7 @@ using ConcurrencyToolkit.Pooling;
 
 namespace ConcurrencyToolkit.Collections;
 
-internal struct SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyValuePair<TKey, TValue>>
+internal class SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyValuePair<TKey, TValue>>
   where TComparer : struct, IEqualityComparer<TKey>
   where TKey : notnull
 {
