@@ -348,12 +348,6 @@ internal class SingleWriterSegment<TKey, TValue, TComparer> : IEnumerable<KeyVal
 
   #region TryGetValue
 
-  // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  // public bool TryGetValue(TKey key, uint hashCode, out TValue value) => TryGetValue<TKey, DirectEquality>(key, hashCode, out value);
-  //
-  // [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  // public bool TryGetValueAlternate<TAlternateKey>(TAlternateKey key, uint hashCode, out TValue value) => TryGetValue<TAlternateKey, AlternateEquality>(key, hashCode, out value);
-
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   public bool TryGetValue<TAlternateKey, TEquality>(TAlternateKey key, uint hashCode, out TValue value)
     where TEquality : struct, IEquality
