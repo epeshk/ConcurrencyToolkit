@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/ConcurrencyToolkit.Benchmarks/ConcurrencyToolkit.Benchmarks.csproj" />
+  <Project Path="src/ConcurrencyToolkit.Tests/ConcurrencyToolkit.Tests.csproj" />
+  <Project Path="src/ConcurrencyToolkit/ConcurrencyToolkit.csproj" />
+</Solution>
